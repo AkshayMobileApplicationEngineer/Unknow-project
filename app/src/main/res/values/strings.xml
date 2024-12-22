@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">UnknowProject</string>
+    <string name="toggle_fab_menu">Toggle FAB Menu</string>
+    <string name="image_slider">Open Image Slider</string>
+    <string name="qr_scanner">Open QR Scanner</string>
+    <string name="transaction_history">View Transaction History</string>
+
+
+<string name="image_slider_toast">Image FAB clicked</string>
+<string name="qr_scanner_toast">QR FAB clicked</string>
+<string name="transaction_history_toast">Transaction FAB clicked</string>
+<string name="error_message">Error: %1$s</string>
+</resources>
