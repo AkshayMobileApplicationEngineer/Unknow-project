@@ -1,6 +1,7 @@
-package com.app.unknownproject
+package com.app.aamdani
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -9,13 +10,13 @@ import android.view.View
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.Toast
+import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.viewpager2.widget.ViewPager2
-import com.app.unknowproject.ProfileActivity
-import com.app.unknowproject.ImageSliderAdapter
-import com.app.unknowproject.QRScannerActivity
-import com.app.unknowproject.R
-import com.app.unknowproject.TransactionHistoryActivity
+import com.app.aamdani.ProfileActivity
+import com.app.aamdani.ImageSliderAdapter
+
+import com.app.aamdani.TransactionHistoryActivity
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 
@@ -36,9 +37,17 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fabOpenAnim: Animation
     private lateinit var fabCloseAnim: Animation
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+
+
+
+        //hide the status bar
+       enableEdgeToEdge()
+
 
         try {
             // Initialize Floating Action Buttons
@@ -57,8 +66,24 @@ class MainActivity : AppCompatActivity() {
                 val intent = Intent(this, ProfileActivity::class.java)
                 startActivity(intent)
             }
-            fabQR.setOnClickListener { openActivity(QRScannerActivity::class.java, "QR Scanner Activity") }
-            fabTransaction.setOnClickListener { openActivity(TransactionHistoryActivity::class.java, "Transaction History Activity") }
+            fabQR.setOnClickListener {
+                openActivity(QRScannerActivity::class.java, "QR Scanner Activity") }
+
+
+            fabTransaction.setOnClickListener {
+                val intent = packageManager.getLaunchIntentForPackage("in.org.npci.upiapp")
+                if (intent != null) {
+                    startActivity(intent)
+                } else {
+                    // If the app is not installed, you can direct the user to the Play Store
+                    val playStoreIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=in.org.npci.upiapp"))
+                    startActivity(playStoreIntent)
+                }
+            }
+
+
+
+
 
             // Restore FAB state
             savedInstanceState?.let {
@@ -73,6 +98,8 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Initialization error: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+
+
 
     private fun setupViewPager() {
         try {

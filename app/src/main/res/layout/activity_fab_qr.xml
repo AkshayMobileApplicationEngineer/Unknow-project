@@ -6,7 +6,7 @@
     android:background="@color/white"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".QRScannerActivity">
+    tools:context="com.app.aamdani.QRScannerActivity">
 
     <ImageView
         android:layout_width="400dp"

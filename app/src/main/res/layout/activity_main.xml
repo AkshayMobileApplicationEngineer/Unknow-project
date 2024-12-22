@@ -2,16 +2,16 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:screenOrientation="landscape"
     xmlns:tools="http://schemas.android.com/tools"
-    tools:context="com.app.unknownproject.MainActivity"
+    tools:context="com.app.aamdani.MainActivity"
     android:background="@color/white">
 
     <!-- ViewPager2 for Image Slider -->
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/viewPager"
-        android:layout_margin="10dp"
-        android:layout_width="400dp"
-        android:layout_height="400dp"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:layout_centerInParent="true" />
 
     <!-- Main Floating Action Button -->

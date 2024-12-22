@@ -13,7 +13,7 @@ android {
         }
     }
 
-    namespace = "com.app.unknowproject"
+    namespace = "com.app.aamdani"
     compileSdk = 35
 
     defaultConfig {
@@ -63,7 +63,11 @@ dependencies {
     implementation(libs.material)
     implementation(libs.androidx.activity)
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.core)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    implementation ("com.google.zxing:core:3.5.1")
+
 }
