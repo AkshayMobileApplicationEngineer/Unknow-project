@@ -1,22 +1,27 @@
 package com.app.aamdani
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
+import android.view.WindowManager
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.viewpager2.widget.ViewPager2
-import com.app.aamdani.ProfileActivity
 import com.app.aamdani.ImageSliderAdapter
-
-import com.app.aamdani.TransactionHistoryActivity
+import com.app.aamdani.ProfileActivity
+import com.app.aamdani.QRScannerActivity
+import com.app.aamdani.R
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 
 
@@ -37,17 +42,25 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fabOpenAnim: Animation
     private lateinit var fabCloseAnim: Animation
 
+    private val permissions = arrayOf(
+        Manifest.permission.READ_EXTERNAL_STORAGE,
+        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+        Manifest.permission.ACCESS_FINE_LOCATION,
+        Manifest.permission.CAMERA
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        // Request permissions
+        requestPermissions()
 
+        // Hide the status bar
+        window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_FULLSCREEN
 
-
-        //hide the status bar
-       enableEdgeToEdge()
-
+        // Keep the screen on
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         try {
             // Initialize Floating Action Buttons
@@ -67,23 +80,12 @@ class MainActivity : AppCompatActivity() {
                 startActivity(intent)
             }
             fabQR.setOnClickListener {
-                openActivity(QRScannerActivity::class.java, "QR Scanner Activity") }
-
-
-            fabTransaction.setOnClickListener {
-                val intent = packageManager.getLaunchIntentForPackage("in.org.npci.upiapp")
-                if (intent != null) {
-                    startActivity(intent)
-                } else {
-                    // If the app is not installed, you can direct the user to the Play Store
-                    val playStoreIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=in.org.npci.upiapp"))
-                    startActivity(playStoreIntent)
-                }
+                openActivity(QRScannerActivity::class.java, "QR Scanner Activity")
             }
 
-
-
-
+            fabTransaction.setOnClickListener {
+                openActivity(TransactionHistoryActivity::class.java, "Transaction History Activity")
+            }
 
             // Restore FAB state
             savedInstanceState?.let {
@@ -99,7 +101,29 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun requestPermissions() {
+        val permissionsToRequest = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
 
+        if (permissionsToRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, permissionsToRequest.toTypedArray(), 1)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        when (requestCode) {
+            1 -> {
+                if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+                    Toast.makeText(this, "Permissions granted", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
 
     private fun setupViewPager() {
         try {
@@ -184,6 +208,10 @@ class MainActivity : AppCompatActivity() {
             Log.e("MainActivity", "Error opening $activityName: ${e.message}", e)
             Toast.makeText(this, "Failed to open $activityName", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    override fun onBackPressed() {
+        // Do nothing to prevent going back
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
