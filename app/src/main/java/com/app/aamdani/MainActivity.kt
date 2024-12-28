@@ -3,7 +3,6 @@ package com.app.aamdani
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -13,16 +12,12 @@ import android.view.WindowManager
 import android.view.animation.Animation
 import android.view.animation.AnimationUtils
 import android.widget.Toast
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.viewpager2.widget.ViewPager2
-import com.app.aamdani.ImageSliderAdapter
-import com.app.aamdani.ProfileActivity
-import com.app.aamdani.QRScannerActivity
-import com.app.aamdani.R
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import android.webkit.JavascriptInterface
 
 
 class MainActivity : AppCompatActivity() {
@@ -34,10 +29,10 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var viewPager: ViewPager2
     private lateinit var handler: Handler
-    private lateinit var autoSlideRunnable: Runnable
-    private var currentPage = 0
-    private val slideInterval = 3000L // Auto-slide interval in milliseconds
 
+    private var currentPage = 0
+    private val slideInterval = 10000L // Auto-slide interval in milliseconds (3 seconds)
+    private var autoSlideRunnable = Runnable { startAutoSlide() }
     private var isFabOpen = false
     private lateinit var fabOpenAnim: Animation
     private lateinit var fabCloseAnim: Animation
@@ -46,7 +41,8 @@ class MainActivity : AppCompatActivity() {
         Manifest.permission.READ_EXTERNAL_STORAGE,
         Manifest.permission.WRITE_EXTERNAL_STORAGE,
         Manifest.permission.ACCESS_FINE_LOCATION,
-        Manifest.permission.CAMERA
+        Manifest.permission.CAMERA,
+        Manifest.permission.INTERNET // Adding internet permission here
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -119,6 +115,23 @@ class MainActivity : AppCompatActivity() {
                 if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
                     Toast.makeText(this, "Permissions granted", Toast.LENGTH_SHORT).show()
                 } else {
+                    // Handle denied permissions with an explanation and request again if necessary
+                    permissions.forEachIndexed { index, permission ->
+                        if (grantResults[index] != PackageManager.PERMISSION_GRANTED) {
+                            if (ActivityCompat.shouldShowRequestPermissionRationale(this, permission)) {
+                                // Show rationale and request permission again
+                                Toast.makeText(this, "Permission for $permission is needed for app functionality.", Toast.LENGTH_LONG).show()
+                                ActivityCompat.requestPermissions(this, arrayOf(permission), 1)
+                            } else {
+                                // Permission denied permanently, guide user to settings
+                                Toast.makeText(this, "Permission denied permanently for $permission. Please enable it in settings.", Toast.LENGTH_LONG).show()
+                                Log.e("MainActivity", "Permission denied permanently for $permission")
+                            }
+                        }
+                    }
+                    // Handle denied permissions
+                    Log.e("MainActivity", "Permissions denied")
+
                     Toast.makeText(this, "Permissions denied", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -128,28 +141,58 @@ class MainActivity : AppCompatActivity() {
     private fun setupViewPager() {
         try {
             viewPager = findViewById(R.id.viewPager)
-            val images = listOf(
-                R.drawable.food,  // Replace with actual drawable resources
-                R.drawable.logo_web,
-                R.drawable.rapido
+
+            // List of images (drawable resources) and videos (URLs or file paths)
+            val items: List<Any> = listOf(
+                R.drawable.food,  // Image resource
+                "android.resource://$packageName/${R.raw.maya}",  // Video URI
+                R.drawable.logo_web,  // Image resource
+                "https://company-task-practics.vercel.app/maya.mp4",
             )
-            val adapter = ImageSliderAdapter(images)
+
+            val adapter = ImageSliderAdapter(items)
             viewPager.adapter = adapter
 
             // Auto-slide functionality
             handler = Handler(Looper.getMainLooper())
-            autoSlideRunnable = Runnable {
-                currentPage = (currentPage + 1) % adapter.itemCount
-                viewPager.setCurrentItem(currentPage, true)
-                handler.postDelayed(autoSlideRunnable, slideInterval)
+             autoSlideRunnable = object : Runnable {
+                override fun run() {
+                    val adapter = viewPager.adapter as ImageSliderAdapter
+
+                    // Advance the page index, wrapping around when reaching the last item
+                    currentPage = (currentPage + 1) % adapter.itemCount
+
+                    viewPager.setCurrentItem(currentPage, true)
+
+                    // Check if the next item is a video or image
+                    val isVideo = adapter.isVideoAtPosition(currentPage)
+                    if (isVideo) {
+                        // Wait for the video completion event to proceed (no auto-slide)
+                        handler.removeCallbacks(autoSlideRunnable)
+                    } else {
+                        // Schedule the next slide
+                        handler.postDelayed(this, slideInterval)
+                    }
+                }
             }
-            handler.postDelayed(autoSlideRunnable, slideInterval)
+
+
+            // Start the auto-slide initially
+            startAutoSlide()
+
+            adapter.setVideoCompletionListener(object : ImageSliderAdapter.VideoCompletionListener {
+                override fun onVideoComplete() {
+                    // Resume auto-slide after video completes
+                    startAutoSlide()
+                }
+            })
+
 
             // Pause auto-slide during user interaction
             viewPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
                 override fun onPageScrollStateChanged(state: Int) {
                     if (state == ViewPager2.SCROLL_STATE_IDLE) {
-                        handler.postDelayed(autoSlideRunnable, slideInterval)
+                        startAutoSlide()
                     } else {
                         handler.removeCallbacks(autoSlideRunnable)
                     }
@@ -160,6 +203,15 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Error setting up ViewPager: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
+    private fun startAutoSlide() {
+        // Remove any previously scheduled callbacks to prevent overlapping
+        handler.removeCallbacks(autoSlideRunnable)
+
+        // Post the auto-slide runnable with a delay
+        handler.postDelayed(autoSlideRunnable, slideInterval)
+    }
+
+
 
     private fun toggleFabMenu() {
         try {
@@ -210,10 +262,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onBackPressed() {
-        // Do nothing to prevent going back
-    }
-
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putBoolean("FAB_STATE", isFabOpen)
@@ -227,4 +275,5 @@ class MainActivity : AppCompatActivity() {
             Log.e("MainActivity", "Error during cleanup: ${e.message}", e)
         }
     }
+
 }

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "544544824654",
+    "project_id": "aamdani-55446",
+    "storage_bucket": "aamdani-55446.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:544544824654:android:a6b0c1fdf28a53791bd21f",
+        "android_client_info": {
+          "package_name": "com.app.aamdani"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDzJFpsGiRvHyCUWw7z9ietftjVF6qKr6k"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
