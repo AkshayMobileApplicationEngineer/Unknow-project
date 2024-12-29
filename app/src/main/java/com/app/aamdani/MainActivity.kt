@@ -1,12 +1,21 @@
 package com.app.aamdani
 
 import ImageSliderAdapter
-import android.app.Activity
+import android.app.AlertDialog
+import android.app.DownloadManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.health.connect.datatypes.ExerciseRoute
+import android.location.Location
+import android.location.LocationListener
+import android.location.LocationManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
 import android.os.Handler
+import android.provider.Settings
 import android.util.Log
 import android.view.View
 import android.view.WindowManager
@@ -16,14 +25,16 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.location.LocationManagerCompat.getCurrentLocation
 import androidx.viewpager2.widget.ViewPager2
+
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
-    private  val LOCATION_PERMISSIONS_CODE = 1001
-    private  val NOTIFICATION_PERMISSIONS_CODE = 1002
 
-
+    private lateinit var locationManager: LocationManager
+    private lateinit var locationListener: LocationListener
     private lateinit var viewPager: ViewPager2
     private lateinit var adapter: ImageSliderAdapter
     private var currentPage = 0
@@ -36,12 +47,15 @@ class MainActivity : AppCompatActivity() {
     private lateinit var fabQR: FloatingActionButton
     private lateinit var fabTransaction: FloatingActionButton
     private var isFabOpen = false
-
     private val autoSlideRunnable = Runnable {
         moveToNextSlide()
     }
 
-
+    companion object {
+        private const val LOCATION_PERMISSIONS_CODE = 1001
+        private const val videolink="https://workholicpraveen.in/Quiz%20Parlour.mp4"
+        private const val LOCATION_PERMISSION_REQUEST_CODE = 1
+    }
     private val items: List<Any> = listOf(
         R.drawable.food,
         "android.resource://com.app.aamdani/raw/maya",
@@ -53,8 +67,20 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+
+
+
         requestPermissions()
 
+
+        // Download the video
+        downloadVideo(videolink)
+
+        // Check if GPS is enabled and show Toast
+        checkGpsStatus()
+
+        // // If you want to show the current location
+        getCurrentLocation()
         if (!requestPermissions()) {
             Toast.makeText(this, "Location permission required", Toast.LENGTH_SHORT).show()
             Log.e("requestPermissions", "Location permission required")
@@ -147,6 +173,8 @@ class MainActivity : AppCompatActivity() {
 
     }
 
+
+
     private fun requestPermissions(): Boolean {
         val permissions = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -220,95 +248,217 @@ class MainActivity : AppCompatActivity() {
 
 
 
-            // Function to start auto-slide
+    // Function to start auto-slide
     private fun startAutoSlide() {
-                handler.removeCallbacks(autoSlideRunnable) //remove any previous auto slide handler
+        handler.removeCallbacks(autoSlideRunnable) //remove any previous auto slide handler
 
 
-                // If the current item is an video, then do not schedule auto slide, video completes and call `moveToNextSlide`
-                if (adapter.getItemViewType(currentPage) != ImageSliderAdapter.TYPE_VIDEO) {
-                    handler.postDelayed(
-                        autoSlideRunnable,
-                        autoSlideInterval
-                    ) // set auto-slide for images if current item is image
-                }
+        // If the current item is an video, then do not schedule auto slide, video completes and call `moveToNextSlide`
+        if (adapter.getItemViewType(currentPage) != ImageSliderAdapter.TYPE_VIDEO) {
+            handler.postDelayed(
+                autoSlideRunnable,
+                autoSlideInterval
+            ) // set auto-slide for images if current item is image
+        }
+    }
+
+    // Function to move to the next slide
+    private fun moveToNextSlide() {
+        if (currentPage < adapter.itemCount - 1) {
+            currentPage++
+            viewPager.setCurrentItem(currentPage, true)
+        } else {
+            currentPage = 0; // Loop back to first slide
+            viewPager.setCurrentItem(currentPage, true);
+        }
+
+    }
+
+    override fun onPause() {
+        super.onPause()
+        handler.removeCallbacks(autoSlideRunnable) //stop auto slide if Activity on pause
+    }
+
+    override fun onResume() {
+        super.onResume()
+        startAutoSlide()// auto slide on resume
+
+    }
+
+    private fun toggleFabMenu() {
+        try {
+            if (isFabOpen) {
+                fabImage.startAnimation(fabCloseAnim)
+                fabQR.startAnimation(fabCloseAnim)
+                fabTransaction.startAnimation(fabCloseAnim)
+                fabImage.visibility = View.GONE
+                fabQR.visibility = View.GONE
+                fabTransaction.visibility = View.GONE
+            } else {
+                fabImage.visibility = View.VISIBLE
+                fabQR.visibility = View.VISIBLE
+                fabTransaction.visibility = View.VISIBLE
+                fabImage.startAnimation(fabOpenAnim)
+                fabQR.startAnimation(fabOpenAnim)
+                fabTransaction.startAnimation(fabOpenAnim)
             }
+            isFabOpen = !isFabOpen
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error toggling FAB menu: ${e.message}", e)
+        }
+    }
 
-            // Function to move to the next slide
-            private fun moveToNextSlide() {
-                if (currentPage < adapter.itemCount - 1) {
-                    currentPage++
-                    viewPager.setCurrentItem(currentPage, true)
-                } else {
-                    currentPage = 0; // Loop back to first slide
-                    viewPager.setCurrentItem(currentPage, true);
-                }
-
+    private fun restoreFabState() {
+        try {
+            if (isFabOpen) {
+                fabImage.visibility = View.VISIBLE
+                fabQR.visibility = View.VISIBLE
+                fabTransaction.visibility = View.VISIBLE
+            } else {
+                fabImage.visibility = View.GONE
+                fabQR.visibility = View.GONE
+                fabTransaction.visibility = View.GONE
             }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error restoring FAB state: ${e.message}", e)
+        }
+    }
 
-            override fun onPause() {
-                super.onPause()
-                handler.removeCallbacks(autoSlideRunnable) //stop auto slide if Activity on pause
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putBoolean("FAB_STATE", isFabOpen)
+    }
+
+    private fun openActivity(activityClass: Class<*>, activityName: String) {
+        try {
+            Toast.makeText(this, "Opening $activityName", Toast.LENGTH_SHORT).show()
+            startActivity(Intent(this, activityClass))
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error opening $activityName: ${e.message}", e)
+            Toast.makeText(this, "Failed to open $activityName", Toast.LENGTH_SHORT).show()
+        }
+    }
+    // Function to download the video
+    private fun downloadVideo(url: String) {
+        val request = DownloadManager.Request(Uri.parse(url))
+        request.setTitle("Quiz Parlour Video") // You can set a custom title
+        request.setDescription("Downloading quiz video...")
+        Log.e("downloadVideo", "url: $url")
+        request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI or DownloadManager.Request.NETWORK_MOBILE)
+        request.setAllowedOverRoaming(false)
+
+        request.setDestinationInExternalPublicDir(Environment.DIRECTORY_MOVIES, "Ads/CureentAdsVideo.mp4")
+
+        request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+
+        val downloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        downloadManager.enqueue(request)
+    }
+
+    private fun checkGpsStatus() {
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val isGpsEnabled = locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
+        Log.e("checkGpsStatus", "isGpsEnabled: $isGpsEnabled")
+        if (!isGpsEnabled) {
+            val builder = AlertDialog.Builder(this)
+            builder.setTitle("Enable GPS")
+            builder.setMessage("GPS is disabled. Do you want to enable it?")
+            builder.setPositiveButton("Yes") { _, _ ->
+                val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+                startActivity(intent)
             }
-
-            override fun onResume() {
-                super.onResume()
-                startAutoSlide()// auto slide on resume
-
+            builder.setNegativeButton("No") { dialog, _ ->
+                dialog.dismiss()
             }
+            builder.show()
+        }
+    }
 
-            private fun toggleFabMenu() {
-                try {
-                    if (isFabOpen) {
-                        fabImage.startAnimation(fabCloseAnim)
-                        fabQR.startAnimation(fabCloseAnim)
-                        fabTransaction.startAnimation(fabCloseAnim)
-                        fabImage.visibility = View.GONE
-                        fabQR.visibility = View.GONE
-                        fabTransaction.visibility = View.GONE
-                    } else {
-                        fabImage.visibility = View.VISIBLE
-                        fabQR.visibility = View.VISIBLE
-                        fabTransaction.visibility = View.VISIBLE
-                        fabImage.startAnimation(fabOpenAnim)
-                        fabQR.startAnimation(fabOpenAnim)
-                        fabTransaction.startAnimation(fabOpenAnim)
-                    }
-                    isFabOpen = !isFabOpen
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error toggling FAB menu: ${e.message}", e)
-                }
-            }
 
-            private fun restoreFabState() {
-                try {
-                    if (isFabOpen) {
-                        fabImage.visibility = View.VISIBLE
-                        fabQR.visibility = View.VISIBLE
-                        fabTransaction.visibility = View.VISIBLE
-                    } else {
-                        fabImage.visibility = View.GONE
-                        fabQR.visibility = View.GONE
-                        fabTransaction.visibility = View.GONE
-                    }
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error restoring FAB state: ${e.message}", e)
-                }
-            }
 
-            override fun onSaveInstanceState(outState: Bundle) {
-                super.onSaveInstanceState(outState)
-                outState.putBoolean("FAB_STATE", isFabOpen)
-            }
 
-            private fun openActivity(activityClass: Class<*>, activityName: String) {
-                try {
-                    Toast.makeText(this, "Opening $activityName", Toast.LENGTH_SHORT).show()
-                    startActivity(Intent(this, activityClass))
-                } catch (e: Exception) {
-                    Log.e("MainActivity", "Error opening $activityName: ${e.message}", e)
-                    Toast.makeText(this, "Failed to open $activityName", Toast.LENGTH_SHORT).show()
-                }
+    private fun getCurrentLocation() {
+        Log.e("getCurrentLocation", "getCurrentLocation called")
+        locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+
+        // Check if GPS is enabled
+        if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+            Toast.makeText(this, "Please enable location services", Toast.LENGTH_SHORT).show()
+            Log.e(
+                "getCurrentLocation",
+                "GPS Provider Enabled: ${locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)}"
+            )
+            val intent = Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)
+            startActivity(intent)
+            return
+        }
+
+        // Check for location permission
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            Log.e("getCurrentLocation", "Permission not granted, requesting permissions")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                requestPermissions(arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), 1)
             }
+        } else {
+            Log.e("getCurrentLocation", "Permissions granted, starting location updates")
+            startLocationUpdates()
+        }
+    }
+
+    private fun startLocationUpdates() {
+        try {
+            // Request location updates
+            locationManager.requestLocationUpdates(
+                LocationManager.GPS_PROVIDER,
+                5000L, // Minimum time interval between updates (in milliseconds)
+                10f // Minimum distance between updates (in meters)
+            ) { location: Location ->
+                Log.e("startLocationUpdates", "Location received: $location")
+                Log.e("startLocationUpdates", "Latitude: ${location.latitude}, Longitude: ${location.longitude}")
+
+
+                //How to get current location
+                val latitude = location.latitude
+                val longitude = location.longitude
+                sendTotheFirebase(latitude, longitude)
+//                Toast.makeText(
+//                    this,
+//                    "Latitude: ${location.latitude}, Longitude: ${location.longitude}",
+//                    Toast.LENGTH_SHORT
+//                ).show()
+            }
+        } catch (e: SecurityException) {
+            Log.e("startLocationUpdates", "SecurityException: ${e.message}")
+        }
+    }
+
+
+
+
+    //Handle the result of the permission request.
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startLocationUpdates()
+
+            } else {
+                Toast.makeText(this, "Location permission denied", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    //Send the location to the firebase
+    private fun sendTotheFirebase(latitude: Double, longitude: Double) {
+        Toast.makeText(this@MainActivity, "Latitude: $latitude, Longitude: $longitude", Toast.LENGTH_SHORT).show()
+    }
+    
+   
+
+
 }
 
