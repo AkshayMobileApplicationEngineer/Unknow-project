@@ -79,3 +79,6 @@ dependencies {
     implementation ("com.google.android.exoplayer:exoplayer-ui:2.19.1")
 
 }
+dependencies {
+    implementation ("com.pierfrancescosoffritti.androidyoutubeplayer:core:12.1.1")
+}
